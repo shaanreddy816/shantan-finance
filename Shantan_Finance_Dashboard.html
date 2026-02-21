@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Shantan's AI Finance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#020817;font-family:'DM Sans',sans-serif;color:white;min-height:100vh}
+  ::-webkit-scrollbar{width:6px;height:6px}
+  ::-webkit-scrollbar-track{background:#0f172a}
+  ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+  ::-webkit-scrollbar-thumb:hover{background:#475569}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes countUp{from{opacity:0}to{opacity:1}}
+  .fade-in{animation:fadeIn 0.4s ease forwards}
+  .ai-bubble p{margin-bottom:6px}
+  .ai-bubble p:last-child{margin-bottom:0}
+
+  /* API Key Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(2,8,23,0.92);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(8px)}
+  .modal-box{background:#0f172a;border:1px solid #334155;border-radius:18px;padding:32px;max-width:480px;width:90%;box-shadow:0 25px 60px rgba(0,0,0,0.6)}
+  .modal-title{font-size:20px;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,#6366f1,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .modal-sub{color:#64748b;font-size:12px;line-height:1.6;margin-bottom:20px}
+  .modal-input{width:100%;background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px 14px;color:white;font-size:13px;outline:none;font-family:'DM Sans',sans-serif;margin-bottom:12px}
+  .modal-input:focus{border-color:#6366f1}
+  .modal-btn{width:100%;background:linear-gradient(135deg,#6366f1,#7c3aed);border:none;border-radius:10px;padding:12px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif}
+  .modal-note{color:#475569;font-size:10px;text-align:center;margin-top:10px;line-height:1.6}
+  .modal-steps{background:#1e293b;border-radius:10px;padding:14px;margin-bottom:16px}
+  .modal-step{color:#94a3b8;font-size:11px;margin-bottom:6px;display:flex;gap:8px}
+  .modal-step:last-child{margin-bottom:0}
+  .step-num{color:#6366f1;font-weight:800;flex-shrink:0}
+  a{color:#818cf8;text-decoration:none}
+  a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Financial Data ────────────────────────────────────────────────────────
+const D = {
+  name: "Shantan", asOf: "Feb 2026",
+  insurance: {
+    p1: { name:"TATA AIA Sampoorna Raksha Promise (3 Cr)", coverage:30000000, premium:207569, due:"15-May-2026" },
+    p2: { name:"TATA AIA Maha Raksha Supreme Select (2 Cr)", coverage:20000000, premium:180110, due:"15-May-2026" },
+    total: 50000000, nominee:"Saritha Godhala (Spouse, 100%)"
+  },
+  sbi: {
+    label:"SBI · Hyderabad", principal:9270000, rate:7.45, emi:73377,
+    tenure:360, paid:21, remaining:339, outstanding:8916192,
+    interestPaid:1187109, principalPaid:353808, totalInterest:17145720,
+    start:"15-May-2024", dueDay:15
+  },
+  icici: {
+    label:"ICICI · Wanaparthy", principal:4660076, rate:9.5, emi:42556,
+    tenure:240, paid:9, remaining:231, outstanding:4607458,
+    totalInterest:5553364, start:"Update in sheet", dueDay:5
+  },
+  expenses: {
+    emiTotal:115933, housing:16667, food:20000, transport:21333,
+    entertainment:500, sip:55000, misc:15000, total:244433, cash:189433,
+    items:[
+      {label:"Loan EMIs", v:115933, icon:"🏦", c:"#3B82F6"},
+      {label:"Housing", v:16667, icon:"🏠", c:"#8B5CF6"},
+      {label:"Food", v:20000, icon:"🛒", c:"#10B981"},
+      {label:"Transport", v:21333, icon:"🚗", c:"#F59E0B"},
+      {label:"SIP", v:55000, icon:"📈", c:"#6366F1"},
+      {label:"Misc", v:15500, icon:"💼", c:"#EC4899"},
+    ]
+  },
+  sip: {
+    monthly:55000, stepUp:15, ret:12, flatCorpus25:104369930,
+    invested25:140443392, gain25:258719970,
+    miles:[
+      {yr:5,  corpus:5917628,   inv:4449972,   mo:96021},
+      {yr:10, corpus:22652999,  inv:13400454,  mo:193718},
+      {yr:15, corpus:65093735,  inv:31403071,  mo:390738},
+      {yr:20, corpus:166407679, inv:67612765,  mo:788226},
+      {yr:25, corpus:399163362, inv:140443392, mo:1589551},
+    ],
+    flatMiles:[2560000,11320000,29780000,62120000,104369930]
+  }
+};
+
+const fmt = n => {
+  if(!n) return '₹0';
+  if(n>=10000000) return `₹${(n/10000000).toFixed(2)} Cr`;
+  if(n>=100000)   return `₹${(n/100000).toFixed(1)} L`;
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+};
+const fmtFull = n => `₹${Math.round(n||0).toLocaleString('en-IN')}`;
+
+const SYSTEM = `You are Shantan's personal AI financial advisor embedded in his private finance dashboard.
+
+His complete financial picture:
+INSURANCE: ₹5 Crore total (3Cr Sampoorna Raksha + 2Cr Maha Raksha Supreme Select). Annual premiums: ₹3.88L combined. Next due: 15-May-2026. Nominee: Saritha Godhala (spouse, 100%).
+
+SBI HOME LOAN (Hyderabad): ₹92,70,000 @ 7.45% p.a. EMI ₹73,377/month due 15th every month. Started May 2024. 21 months paid (339 remaining of 360). Outstanding: ₹89,16,192. Total interest full tenure: ₹1.71 Crore. Interest paid so far: ₹11.87L. Principal repaid: ₹3.54L.
+
+ICICI HOME LOAN (Wanaparthy): ₹46,60,076 @ 9.5% p.a. EMI ₹42,556/month due 5th. 20-year tenure (240 months), ~9 months paid. Outstanding: ~₹46.07L. Total interest over tenure: ₹55.5L.
+
+MONTHLY EXPENSES (₹2,44,433 total): EMIs ₹1,15,933 | Housing/Utils ₹16,667 | Groceries ₹10,000 | Restaurant ₹10,000 | Transport/Petrol ₹20,000 | Car Insurance ₹1,333/mo | Entertainment ₹500 | SIP ₹55,000 | Misc ₹15,000. Cash spend excl SIP: ₹1,89,433/mo.
+
+SIP: ₹55,000/month with 15% annual step-up, 12% expected annual return. Projections: 5yr=₹59.2L, 10yr=₹2.27Cr, 15yr=₹6.51Cr, 20yr=₹16.6Cr, 25yr=₹39.9Cr. Flat SIP (no step-up) 25yr = ₹10.4Cr only. Step-up gives ₹29.5Cr MORE.
+
+Respond in 2-4 concise paragraphs. Be specific with rupee amounts. Give actionable advice. Address Shantan by first name occasionally. Don't use markdown headers — just clear paragraphs.`;
+
+// ─── Animated counter ──────────────────────────────────────────────────────
+function Counter({value, dur=1400}) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const s = performance.now();
+    const tick = t => {
+      const p = Math.min((t-s)/dur,1);
+      const e = 1-Math.pow(1-p,3);
+      setN(Math.round(value*e));
+      if(p<1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  },[value,dur]);
+  return <span>{fmt(n)}</span>;
+}
+
+// ─── Donut chart ───────────────────────────────────────────────────────────
+function Donut({data, size=130}) {
+  const total = data.reduce((s,d)=>s+d.v,0);
+  let off=0; const R=40,cx=60,cy=60,C=2*Math.PI*R;
+  const slices = data.map(d=>{
+    const p=d.v/total, dash=p*C, gap=C-dash, o=off*C;
+    off+=p; return {...d,dash,gap,offset:o};
+  });
+  return (
+    <svg width={size} height={size} viewBox="0 0 120 120">
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="#1e293b" strokeWidth="18"/>
+      {slices.map((s,i)=>(
+        <circle key={i} cx={cx} cy={cy} r={R} fill="none"
+          stroke={s.c} strokeWidth="18"
+          strokeDasharray={`${s.dash} ${s.gap}`}
+          strokeDashoffset={-s.offset}
+          transform={`rotate(-90 ${cx} ${cy})`}/>
+      ))}
+      <text x={cx} y={cy-4} textAnchor="middle" fill="#64748b" fontSize="8" fontFamily="DM Sans">Monthly</text>
+      <text x={cx} y={cy+8} textAnchor="middle" fill="white" fontSize="9" fontWeight="700" fontFamily="DM Sans">₹2.44L</text>
+    </svg>
+  );
+}
+
+// ─── Progress bar ──────────────────────────────────────────────────────────
+function Progress({label, paid, total, rem, color}) {
+  const pct = ((total-rem)/total*100).toFixed(1);
+  return (
+    <div style={{marginBottom:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+        <span style={{color:'#cbd5e1',fontSize:11,fontWeight:600}}>{label}</span>
+        <span style={{color:'#475569',fontSize:10}}>{paid} paid · {rem} left</span>
+      </div>
+      <div style={{background:'#1e293b',borderRadius:6,height:7,overflow:'hidden'}}>
+        <div style={{width:`${pct}%`,height:'100%',background:color,borderRadius:6,transition:'width 1.2s ease'}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
+        <span style={{color:color,fontSize:10,fontWeight:700}}>{pct}% repaid</span>
+        <span style={{color:'#475569',fontSize:10}}>{(100-pct).toFixed(1)}% left</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── SIP bar ───────────────────────────────────────────────────────────────
+function SipBar({m}) {
+  const gain = ((m.corpus/m.inv*100)-100).toFixed(0);
+  const w = (m.corpus/399163362*100).toFixed(1);
+  return (
+    <div style={{marginBottom:13}}>
+      <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+        <span style={{color:'#a78bfa',fontSize:11,fontWeight:700}}>Year {m.yr}</span>
+        <div>
+          <span style={{color:'white',fontSize:12,fontWeight:800}}>{fmt(m.corpus)}</span>
+          <span style={{color:'#10b981',fontSize:10,marginLeft:8}}>+{gain}%</span>
+        </div>
+      </div>
+      <div style={{background:'#1e293b',borderRadius:4,height:5,overflow:'hidden',marginBottom:2}}>
+        <div style={{width:`${w}%`,height:'100%',background:'linear-gradient(90deg,#6366f1,#a78bfa)',transition:'width 1.5s ease'}}/>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between'}}>
+        <span style={{color:'#475569',fontSize:10}}>SIP: {fmt(m.mo)}/mo</span>
+        <span style={{color:'#475569',fontSize:10}}>Invested: {fmt(m.inv)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── KPI card ──────────────────────────────────────────────────────────────
+function KPI({label, value, sub, color='white', accent='#6366f1', delay=0}) {
+  return (
+    <div style={{background:'#0f172a',border:`1px solid ${accent}30`,borderRadius:12,padding:'14px 16px',position:'relative',overflow:'hidden',animation:`fadeIn 0.5s ease ${delay}ms both`}}>
+      <div style={{position:'absolute',top:0,left:0,right:0,height:2,background:`linear-gradient(90deg,${accent},${accent}60)`}}/>
+      <div style={{color:'#64748b',fontSize:9,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.07em',marginBottom:6}}>{label}</div>
+      <div style={{color,fontSize:20,fontWeight:800,lineHeight:1}}><Counter value={typeof value==='number'?value:0} dur={1200+delay}/></div>
+      <div style={{color:'#475569',fontSize:10,marginTop:4}}>{sub}</div>
+    </div>
+  );
+}
+
+// ─── Section card ──────────────────────────────────────────────────────────
+function Card({children, style={}}) {
+  return <div style={{background:'#0f172a',border:'1px solid #1e293b',borderRadius:14,padding:20,...style}}>{children}</div>;
+}
+function CardTitle({icon,children,color='#e2e8f0'}) {
+  return <div style={{color,fontSize:13,fontWeight:700,marginBottom:14,display:'flex',alignItems:'center',gap:8}}><span>{icon}</span>{children}</div>;
+}
+
+// ─── API Key Modal ─────────────────────────────────────────────────────────
+function APIModal({onSave}) {
+  const [key, setKey] = useState('');
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box">
+        <div className="modal-title">🤖 Connect AI Advisor</div>
+        <div className="modal-sub">Enter your Anthropic API key to enable the live AI financial advisor. Your key is stored only in your browser — never sent anywhere except Anthropic's servers.</div>
+        <div className="modal-steps">
+          <div className="modal-step"><span className="step-num">1</span><span>Go to <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> and sign in</span></div>
+          <div className="modal-step"><span className="step-num">2</span><span>Click <strong style={{color:'#e2e8f0'}}>API Keys</strong> → <strong style={{color:'#e2e8f0'}}>Create Key</strong></span></div>
+          <div className="modal-step"><span className="step-num">3</span><span>Copy the key (starts with <code style={{color:'#a78bfa'}}>sk-ant-...</code>) and paste below</span></div>
+        </div>
+        <input className="modal-input" type="password" value={key} onChange={e=>setKey(e.target.value)}
+          onKeyDown={e=>e.key==='Enter'&&key.startsWith('sk-ant')&&onSave(key)}
+          placeholder="sk-ant-api03-..."/>
+        <button className="modal-btn" onClick={()=>key.trim()&&onSave(key.trim())} disabled={!key.trim()}>
+          Connect & Open Dashboard →
+        </button>
+        <button style={{width:'100%',background:'transparent',border:'1px solid #334155',borderRadius:10,padding:10,color:'#64748b',fontSize:12,cursor:'pointer',marginTop:8,fontFamily:'DM Sans,sans-serif'}}
+          onClick={()=>onSave('demo')}>
+          Skip AI — Browse Dashboard Only
+        </button>
+        <div className="modal-note">Your API key is saved in localStorage and used only for the AI chat feature.<br/>Typical cost: &lt;₹5 per 100 questions.</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ──────────────────────────────────────────────────────────────
+function App() {
+  const [apiKey, setApiKey] = useState(()=>localStorage.getItem('shantan_apikey')||'');
+  const [showModal, setShowModal] = useState(!localStorage.getItem('shantan_apikey'));
+  const [tab, setTab] = useState('overview');
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [insight, setInsight] = useState('');
+  const [insightLoading, setInsightLoading] = useState(false);
+  const chatEnd = useRef(null);
+
+  const saveKey = k => {
+    if(k==='demo'){setShowModal(false);return;}
+    localStorage.setItem('shantan_apikey',k);
+    setApiKey(k); setShowModal(false);
+    generateInsight(k);
+  };
+
+  const callAI = async (msgs, key) => {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,system:SYSTEM,messages:msgs})
+    });
+    if(!res.ok) throw new Error(await res.text());
+    const d = await res.json();
+    return d.content?.[0]?.text||'No response';
+  };
+
+  const generateInsight = async key => {
+    if(!key||key==='demo') return;
+    setInsightLoading(true);
+    try {
+      const t = await callAI([{role:'user',content:'Give me a sharp 3-point executive summary of my financial health. One bullet each on: 1) Overall position & biggest risk, 2) Loan strategy, 3) Wealth building outlook. Keep each bullet to 1-2 sentences. Start directly, no intro text.'}], key);
+      setInsight(t);
+    } catch(e) {
+      setInsight('• Strong ₹5 Crore insurance coverage protects your family — nominee Saritha Godhala covered 100%.\n• Combined loan burden of ₹1.35 Crore (SBI 7.45% + ICICI 9.5%) — consider prepayments to save ₹1.7 Crore+ in interest.\n• Step-up SIP at 15% annually projects ₹39.9 Crore in 25 years — nearly 4x more than flat SIP.');
+    }
+    setInsightLoading(false);
+  };
+
+  useEffect(() => {
+    if(apiKey && apiKey!=='demo') generateInsight(apiKey);
+  }, []);
+
+  useEffect(() => { chatEnd.current?.scrollIntoView({behavior:'smooth'}); }, [messages]);
+
+  const send = async () => {
+    if(!input.trim()||loading) return;
+    if(!apiKey||apiKey==='demo'){alert('Please add your API key to use the AI advisor.');return;}
+    const userMsg = {role:'user',content:input};
+    const newMsgs = [...messages, userMsg];
+    setMessages(newMsgs); setInput(''); setLoading(true);
+    try {
+      const reply = await callAI(newMsgs, apiKey);
+      setMessages([...newMsgs,{role:'assistant',content:reply}]);
+    } catch(e) {
+      setMessages([...newMsgs,{role:'assistant',content:'Connection error. Check your API key and try again.'}]);
+    }
+    setLoading(false);
+  };
+
+  const quickQ = (q) => { setInput(q); setTab('ai'); };
+
+  const S = {
+    nav:{background:'rgba(2,8,23,0.96)',borderBottom:'1px solid #1e293b',padding:'0 24px',display:'flex',alignItems:'center',justifyContent:'space-between',height:54,position:'sticky',top:0,zIndex:100,backdropFilter:'blur(12px)'},
+    main:{maxWidth:1380,margin:'0 auto',padding:'20px 18px'},
+    g4:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:20},
+    g3:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:16},
+    g2:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:16},
+    tabs:{display:'flex',gap:4,marginBottom:22,background:'#0f172a',borderRadius:10,padding:4,width:'fit-content'},
+    tab:(a)=>({padding:'7px 16px',borderRadius:7,cursor:'pointer',fontSize:12,fontWeight:600,transition:'all 0.2s',background:a?'linear-gradient(135deg,#6366f1,#7c3aed)':'transparent',color:a?'white':'#64748b',border:'none',outline:'none',fontFamily:'DM Sans,sans-serif'}),
+    insightBar:{background:'linear-gradient(135deg,rgba(99,102,241,0.12),rgba(167,139,250,0.06))',border:'1px solid rgba(99,102,241,0.25)',borderRadius:12,padding:'14px 18px',marginBottom:20,display:'flex',gap:14,alignItems:'flex-start'},
+    chatBox:{background:'#0f172a',border:'1px solid #1e293b',borderRadius:14,display:'flex',flexDirection:'column',height:460},
+    uBubble:{background:'linear-gradient(135deg,#6366f1,#7c3aed)',borderRadius:'14px 14px 4px 14px',padding:'9px 13px',maxWidth:'76%',alignSelf:'flex-end',fontSize:12,lineHeight:1.6},
+    aBubble:{background:'#1e293b',border:'1px solid #334155',borderRadius:'14px 14px 14px 4px',padding:'9px 13px',maxWidth:'80%',alignSelf:'flex-start',fontSize:12,lineHeight:1.7,color:'#cbd5e1'},
+    ipt:{flex:1,background:'#1e293b',border:'1px solid #334155',borderRadius:10,padding:'9px 13px',color:'white',fontSize:12,outline:'none',fontFamily:'DM Sans,sans-serif'},
+    btn:{background:'linear-gradient(135deg,#6366f1,#7c3aed)',border:'none',borderRadius:10,padding:'9px 15px',color:'white',cursor:'pointer',fontSize:12,fontWeight:700,fontFamily:'DM Sans,sans-serif'},
+    qBtn:{background:'#1e293b',border:'1px solid #334155',borderRadius:8,padding:'6px 11px',color:'#94a3b8',cursor:'pointer',fontSize:11,fontFamily:'DM Sans,sans-serif'},
+  };
+
+  const Overview = () => (
+    <>
+      <div style={S.g4}>
+        <KPI label="Total Insurance Coverage" value={D.insurance.total} sub="TATA AIA · 5 Crore" color="#60a5fa" accent="#3b82f6" delay={0}/>
+        <KPI label="Combined Loan Outstanding" value={D.sbi.outstanding+D.icici.outstanding} sub="SBI + ICICI" color="#f87171" accent="#ef4444" delay={80}/>
+        <KPI label="Monthly Outflow (Total)" value={D.expenses.total} sub={`Cash spend: ${fmt(D.expenses.cash)}`} color="#fbbf24" accent="#f59e0b" delay={160}/>
+        <KPI label="SIP Corpus — 25 Years" value={D.sip.miles[4].corpus} sub="15% step-up · 12% return" color="#a78bfa" accent="#6366f1" delay={240}/>
+      </div>
+      <div style={S.g4}>
+        <KPI label="SBI EMI · Due 15th" value={D.sbi.emi} sub="Hyderabad · 7.45% p.a." color="white" accent="#0ea5e9" delay={300}/>
+        <KPI label="ICICI EMI · Due 5th" value={D.icici.emi} sub="Wanaparthy · 9.5% p.a." color="white" accent="#14b8a6" delay={360}/>
+        <KPI label="Monthly SIP" value={D.sip.monthly} sub="+15% step-up every year" color="#34d399" accent="#10b981" delay={420}/>
+        <KPI label="Total Interest (Both Loans)" value={D.sbi.totalInterest+D.icici.totalInterest} sub="Full tenure cost" color="#fb923c" accent="#f97316" delay={480}/>
+      </div>
+
+      <div style={{...S.g3,gridTemplateColumns:'1fr 1fr 1.2fr'}}>
+        <Card>
+          <CardTitle icon="💸">Monthly Expenses</CardTitle>
+          <div style={{display:'flex',alignItems:'center',gap:14}}>
+            <Donut data={D.expenses.items} size={120}/>
+            <div style={{flex:1}}>
+              {D.expenses.items.map((e,i)=>(
+                <div key={i} style={{display:'flex',justifyContent:'space-between',marginBottom:5,alignItems:'center'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:5}}>
+                    <div style={{width:7,height:7,borderRadius:2,background:e.c,flexShrink:0}}/>
+                    <span style={{color:'#94a3b8',fontSize:10}}>{e.label}</span>
+                  </div>
+                  <span style={{color:'#e2e8f0',fontSize:10,fontWeight:700}}>{fmt(e.v)}</span>
+                </div>
+              ))}
+              <div style={{borderTop:'1px solid #1e293b',paddingTop:5,marginTop:5,display:'flex',justifyContent:'space-between'}}>
+                <span style={{color:'#64748b',fontSize:10,fontWeight:700}}>Total</span>
+                <span style={{color:'#ef4444',fontSize:11,fontWeight:800}}>{fmt(D.expenses.total)}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle icon="🏠">Loan Repayment Progress</CardTitle>
+          <Progress label="SBI · Hyderabad" paid={D.sbi.paid} total={D.sbi.tenure} rem={D.sbi.remaining} color="#3b82f6"/>
+          <Progress label="ICICI · Wanaparthy" paid={D.icici.paid} total={D.icici.tenure} rem={D.icici.remaining} color="#14b8a6"/>
+          <div style={{marginTop:10,padding:'9px 11px',background:'#1e293b',borderRadius:8}}>
+            <div style={{color:'#64748b',fontSize:9,marginBottom:3}}>COMBINED OUTSTANDING</div>
+            <div style={{color:'#ef4444',fontSize:15,fontWeight:800}}>{fmtFull(D.sbi.outstanding+D.icici.outstanding)}</div>
+            <div style={{color:'#475569',fontSize:10,marginTop:2}}>Pay today → saves {fmt((D.sbi.totalInterest-D.sbi.interestPaid)+D.icici.totalInterest)} interest</div>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle icon="📈">SIP Wealth Growth (15% Step-Up)</CardTitle>
+          {D.sip.miles.map((m,i)=><SipBar key={i} m={m}/>)}
+        </Card>
+      </div>
+
+      <div style={{...S.g2,gridTemplateColumns:'1.5fr 1fr'}}>
+        <Card>
+          <CardTitle icon="🛡">TATA AIA Term Insurance</CardTitle>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+            {[D.insurance.p1,D.insurance.p2].map((p,i)=>(
+              <div key={i} style={{background:'#1e293b',borderRadius:10,padding:13,border:'1px solid #334155'}}>
+                <div style={{color:'#60a5fa',fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:5}}>{i===0?'3 Crore':'2 Crore'} Policy</div>
+                <div style={{color:'white',fontSize:13,fontWeight:800,marginBottom:3}}>{fmt(p.coverage)}</div>
+                <div style={{color:'#64748b',fontSize:9,marginBottom:2}}>Premium: {fmt(p.premium)}/yr</div>
+                <div style={{color:'#64748b',fontSize:9,marginBottom:6}}>Next: {p.due}</div>
+                <div style={{background:'rgba(16,185,129,0.1)',border:'1px solid rgba(16,185,129,0.3)',borderRadius:5,padding:'3px 7px',display:'inline-block'}}>
+                  <span style={{color:'#10b981',fontSize:9,fontWeight:700}}>Active ✓</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{padding:'8px 12px',background:'rgba(59,130,246,0.08)',border:'1px solid rgba(59,130,246,0.2)',borderRadius:8}}>
+            <span style={{color:'#93c5fd',fontSize:11}}>⭐ Total: <strong>₹5 Crore</strong> · {D.insurance.nominee}</span>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle icon="⏰">Payment Reminders</CardTitle>
+          {[
+            {day:"5th",label:"ICICI EMI",amount:fmt(D.icici.emi),c:"#14b8a6",urgent:true},
+            {day:"15th",label:"SBI EMI",amount:fmt(D.sbi.emi),c:"#3b82f6"},
+            {day:"SIP Date",label:"Monthly SIP (15% step-up)",amount:fmt(D.sip.monthly),c:"#a78bfa"},
+            {day:"15-May",label:"TATA AIA Premiums",amount:fmt(D.insurance.p1.premium+D.insurance.p2.premium)+"/yr",c:"#f59e0b"},
+          ].map((r,i)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:9,padding:'7px 9px',background:'#1e293b',borderRadius:8}}>
+              <div style={{background:`${r.c}20`,border:`1px solid ${r.c}40`,borderRadius:6,padding:'3px 7px',minWidth:58,textAlign:'center'}}>
+                <div style={{color:r.c,fontSize:10,fontWeight:800}}>{r.day}</div>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{color:'#e2e8f0',fontSize:11,fontWeight:600}}>{r.label}</div>
+                <div style={{color:'#64748b',fontSize:10}}>{r.amount}</div>
+              </div>
+              {r.urgent&&<div style={{background:'rgba(239,68,68,0.12)',border:'1px solid rgba(239,68,68,0.25)',borderRadius:5,padding:'2px 7px'}}>
+                <span style={{color:'#f87171',fontSize:9,fontWeight:700}}>DUE SOON</span>
+              </div>}
+            </div>
+          ))}
+        </Card>
+      </div>
+    </>
+  );
+
+  const Loans = () => (
+    <>
+      <div style={S.g2}>
+        {[
+          {loan:D.sbi,  title:"SBI Home Loan · Hyderabad",  c:"#3b82f6"},
+          {loan:D.icici,title:"ICICI Home Loan · Wanaparthy",c:"#14b8a6"},
+        ].map(({loan,title,c},i)=>(
+          <Card key={i} style={{border:`1px solid ${c}25`}}>
+            <CardTitle icon="🏦" color={c}>{title}</CardTitle>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:9,marginBottom:14}}>
+              {[
+                ["Principal", fmtFull(loan.principal)],
+                ["Rate p.a.", `${loan.rate}%`],
+                ["Monthly EMI", fmtFull(loan.emi), false, "#e2e8f0"],
+                ["Tenure", `${loan.tenure} mos`],
+                ["Months Paid", loan.paid],
+                ["Months Left", loan.remaining],
+                ["Outstanding", fmtFull(loan.outstanding), true, "#f87171"],
+                ["Total Interest", fmtFull(loan.totalInterest), false, "#fb923c"],
+              ].map(([k,v,hi,vc],j)=>(
+                <div key={j} style={{background:'#1e293b',borderRadius:8,padding:'7px 9px'}}>
+                  <div style={{color:'#64748b',fontSize:9,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:2}}>{k}</div>
+                  <div style={{color:vc||'white',fontSize:12,fontWeight:700}}>{v}</div>
+                </div>
+              ))}
+            </div>
+            <Progress label={`${loan.label} Progress`} paid={loan.paid} total={loan.tenure} rem={loan.remaining} color={c}/>
+            <div style={{background:`${c}10`,border:`1px solid ${c}20`,borderRadius:8,padding:'9px 11px',marginTop:8}}>
+              <div style={{color:'#94a3b8',fontSize:10,marginBottom:2}}>💡 Full Payoff Amount Today</div>
+              <div style={{color:c,fontSize:16,fontWeight:800}}>{fmtFull(loan.outstanding)}</div>
+              <div style={{color:'#475569',fontSize:10,marginTop:1}}>Clears in one payment · saves future interest</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+      <Card>
+        <CardTitle icon="💡">What-If Scenarios — Ask the AI Advisor</CardTitle>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+          {["If I pay ₹20,000 extra on SBI monthly, how many years saved?","Best way to use ₹5 lakh bonus — SBI or ICICI prepayment?","When will both loans close at current EMI?","How much interest will I save by closing SBI in 10 years?","Should I prioritise paying SBI (7.45%) or ICICI (9.5%) first?"].map((q,i)=>(
+            <button key={i} style={S.qBtn} onClick={()=>quickQ(q)}
+              onMouseEnter={e=>{e.target.style.background='#334155';e.target.style.color='white'}}
+              onMouseLeave={e=>{e.target.style.background='#1e293b';e.target.style.color='#94a3b8'}}>
+              {q}
+            </button>
+          ))}
+        </div>
+      </Card>
+    </>
+  );
+
+  const SIP = () => (
+    <>
+      <div style={S.g4}>
+        {[
+          {label:"Starting SIP", value:D.sip.monthly, sub:"₹55,000/month now", c:"#a78bfa", a:"#6366f1"},
+          {label:"25yr Corpus (Step-Up)", value:D.sip.miles[4].corpus, sub:"15% annual increase", c:"#10b981", a:"#059669"},
+          {label:"Total Invested 25yr", value:D.sip.invested25, sub:"Your actual contribution", c:"white", a:"#f59e0b"},
+          {label:"Extra vs Flat SIP", value:D.sip.miles[4].corpus-D.sip.flatCorpus25, sub:"Power of 15% step-up!", c:"#34d399", a:"#059669"},
+        ].map((k,i)=><KPI key={i} label={k.label} value={k.value} sub={k.sub} color={k.c} accent={k.a} delay={i*80}/>)}
+      </div>
+      <div style={{...S.g2,gridTemplateColumns:'1fr 1.3fr'}}>
+        <Card>
+          <CardTitle icon="📊">Year-by-Year Milestones</CardTitle>
+          {D.sip.miles.map((m,i)=><SipBar key={i} m={m}/>)}
+          <div style={{marginTop:10,padding:'9px 11px',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.25)',borderRadius:8}}>
+            <div style={{color:'#a78bfa',fontSize:9,fontWeight:700,marginBottom:3}}>WEALTH MULTIPLE</div>
+            <div style={{color:'white',fontSize:18,fontWeight:800}}>{(D.sip.miles[4].corpus/D.sip.invested25).toFixed(1)}x</div>
+            <div style={{color:'#64748b',fontSize:10}}>{fmt(D.sip.invested25)} invested → {fmt(D.sip.miles[4].corpus)}</div>
+          </div>
+        </Card>
+        <Card>
+          <CardTitle icon="🆚">Step-Up vs Flat SIP Comparison</CardTitle>
+          {D.sip.miles.map((m,i)=>{
+            const flat=D.sip.flatMiles[i];
+            const extra=((m.corpus/flat-1)*100).toFixed(0);
+            return (
+              <div key={i} style={{marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                  <span style={{color:'#94a3b8',fontSize:11,fontWeight:600}}>Year {m.yr}</span>
+                  <span style={{color:'#34d399',fontSize:10,fontWeight:700}}>Step-Up wins +{extra}%</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <div style={{background:'#1e293b',borderRadius:6,padding:'5px 9px'}}>
+                    <div style={{color:'#64748b',fontSize:9,marginBottom:1}}>Flat SIP ₹55k</div>
+                    <div style={{color:'#60a5fa',fontSize:11,fontWeight:700}}>{fmt(flat)}</div>
+                  </div>
+                  <div style={{background:'rgba(99,102,241,0.12)',border:'1px solid rgba(99,102,241,0.25)',borderRadius:6,padding:'5px 9px'}}>
+                    <div style={{color:'#a78bfa',fontSize:9,marginBottom:1}}>15% Step-Up ⭐</div>
+                    <div style={{color:'#a78bfa',fontSize:11,fontWeight:800}}>{fmt(m.corpus)}</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div style={{padding:'9px 11px',background:'rgba(16,185,129,0.08)',border:'1px solid rgba(16,185,129,0.25)',borderRadius:8,marginTop:8}}>
+            <span style={{color:'#34d399',fontSize:11,fontWeight:700}}>💡 Step-up gives <strong>{fmt(D.sip.miles[4].corpus-D.sip.flatCorpus25)}</strong> MORE than flat SIP over 25 years!</span>
+          </div>
+          <div style={{marginTop:10,padding:'9px 11px',background:'rgba(245,158,11,0.08)',border:'1px solid rgba(245,158,11,0.2)',borderRadius:8}}>
+            <span style={{color:'#fbbf24',fontSize:11}}>🚀 Pro Tip: When both loans close, redirect ₹1.16L/mo EMIs into SIP — corpus could cross ₹80 Cr!</span>
+          </div>
+        </Card>
+      </div>
+    </>
+  );
+
+  const AITab = () => (
+    <div style={{...S.g2,gridTemplateColumns:'1fr 1.4fr',alignItems:'start'}}>
+      <div>
+        <Card style={{marginBottom:14}}>
+          <CardTitle icon="⚡">Quick Questions</CardTitle>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>
+            {["How much to pay off both loans today?","If I pay ₹20k extra on SBI monthly — years saved?","What's my overall net worth right now?","SIP vs loan prepayment — what's smarter?","How much will my SIP be in 10 years?","Best use of a ₹10 lakh bonus?","When will ICICI loan close at current EMI?","Should I increase SIP or prepay loans first?"].map((q,i)=>(
+              <button key={i} style={S.qBtn} onClick={()=>{setInput(q);document.getElementById('chat-input')?.focus()}}
+                onMouseEnter={e=>{e.target.style.background='#334155';e.target.style.color='white'}}
+                onMouseLeave={e=>{e.target.style.background='#1e293b';e.target.style.color='#94a3b8'}}>
+                {q}
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <CardTitle icon="🧠">What I Know About You</CardTitle>
+          {[
+            ["Insurance","₹5 Crore · TATA AIA · 2 policies"],
+            ["SBI Loan","₹89.2L outstanding · 7.45% · 339 mos left"],
+            ["ICICI Loan","₹46.1L outstanding · 9.5% · 231 mos left"],
+            ["Monthly Outflow","₹2,44,433 total · ₹1,89,433 cash"],
+            ["SIP","₹55K/mo · 15% step-up · ₹39.9Cr in 25yr"],
+            ["Nominee","Saritha Godhala · 100%"],
+          ].map(([k,v],i)=>(
+            <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:i<5?'1px solid #1e293b':'none'}}>
+              <span style={{color:'#94a3b8',fontSize:11,fontWeight:600}}>{k}</span>
+              <span style={{color:'#e2e8f0',fontSize:11,textAlign:'right',maxWidth:'60%'}}>{v}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      <div style={S.chatBox}>
+        <div style={{padding:'12px 16px',borderBottom:'1px solid #1e293b',display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#6366f1,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>🤖</div>
+          <div>
+            <div style={{color:'white',fontSize:13,fontWeight:700}}>AI Financial Advisor</div>
+            <div style={{color:apiKey&&apiKey!=='demo'?'#10b981':'#f59e0b',fontSize:10}}>
+              {apiKey&&apiKey!=='demo'?'● Online · Knows your full financial picture':'● Demo mode — add API key for live AI'}
+            </div>
+          </div>
+          {(!apiKey||apiKey==='demo')&&(
+            <button style={{marginLeft:'auto',...S.btn,fontSize:10,padding:'5px 10px'}} onClick={()=>setShowModal(true)}>Add API Key</button>
+          )}
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:14,display:'flex',flexDirection:'column',gap:10}}>
+          {messages.length===0&&(
+            <div style={S.aBubble} className="ai-bubble">
+              {apiKey&&apiKey!=='demo'
+                ? "Hi Shantan! 👋 I'm your personal AI financial advisor. I have complete knowledge of your SBI loan (₹89.2L outstanding), ICICI loan (₹46.1L), ₹55K SIP with 15% step-up, ₹5 Crore insurance, and all your monthly expenses. Ask me anything!"
+                : "Welcome to your Finance Dashboard! To enable the AI advisor with personalized answers about your loans, SIP, and financial planning — click 'Add API Key' above."}
+            </div>
+          )}
+          {messages.map((m,i)=>(
+            <div key={i} style={m.role==='user'?S.uBubble:S.aBubble} className={m.role==='assistant'?'ai-bubble':''}>
+              {m.content}
+            </div>
+          ))}
+          {loading&&(
+            <div style={S.aBubble}>
+              <span style={{color:'#64748b'}}>Analysing your finances</span>
+              <span style={{animation:'pulse 1s ease infinite'}}>...</span>
+            </div>
+          )}
+          <div ref={chatEnd}/>
+        </div>
+        <div style={{padding:'6px 12px',display:'flex',flexWrap:'wrap',gap:5,borderTop:'1px solid #1e293b'}}>
+          {["Prepayment impact?","Best use of bonus?","SIP vs prepay?"].map((q,i)=>(
+            <button key={i} style={{...S.qBtn,fontSize:10}} onClick={()=>setInput(q)}
+              onMouseEnter={e=>{e.target.style.background='#334155';e.target.style.color='white'}}
+              onMouseLeave={e=>{e.target.style.background='#1e293b';e.target.style.color='#94a3b8'}}>
+              {q}
+            </button>
+          ))}
+        </div>
+        <div style={{padding:'10px 12px',borderTop:'1px solid #1e293b',display:'flex',gap:8,alignItems:'center'}}>
+          <input id="chat-input" style={S.ipt} value={input} onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&send()}
+            placeholder={apiKey&&apiKey!=='demo'?"Ask anything about your finances...":"Add API key to chat with AI advisor..."}/>
+          <button style={S.btn} onClick={send} disabled={loading||!apiKey||apiKey==='demo'}>
+            {loading?'...':'Ask →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{minHeight:'100vh',background:'#020817',fontFamily:"'DM Sans',sans-serif",color:'white'}}>
+      {showModal && <APIModal onSave={saveKey}/>}
+
+      <div style={S.nav}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>💼</div>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,background:'linear-gradient(135deg,#6366f1,#a78bfa)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>Shantan's Finance Dashboard</div>
+            <div style={{color:'#475569',fontSize:10}}>Personal Financial Intelligence</div>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:20}}>
+          <div style={{textAlign:'right'}}>
+            <div style={{color:'#64748b',fontSize:9}}>MONTHLY OUTFLOW</div>
+            <div style={{color:'#ef4444',fontSize:13,fontWeight:800}}>{fmt(D.expenses.total)}</div>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <div style={{color:'#64748b',fontSize:9}}>SIP 25YR TARGET</div>
+            <div style={{color:'#a78bfa',fontSize:13,fontWeight:800}}>{fmt(D.sip.miles[4].corpus)}</div>
+          </div>
+          <div style={{color:'#475569',fontSize:11}}>As of {D.asOf}</div>
+        </div>
+      </div>
+
+      <div style={S.main}>
+        {/* AI Insight bar */}
+        <div style={S.insightBar}>
+          <span style={{fontSize:20,flexShrink:0,marginTop:1}}>🤖</span>
+          <div style={{flex:1}}>
+            <div style={{color:'#a78bfa',fontSize:10,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase',marginBottom:5}}>AI Financial Snapshot</div>
+            {insightLoading
+              ? <div style={{color:'#475569',fontSize:12}}>Analysing your finances...</div>
+              : insight
+                ? <div style={{color:'#cbd5e1',fontSize:12,lineHeight:1.7,whiteSpace:'pre-line'}}>{insight}</div>
+                : <div style={{color:'#475569',fontSize:12}}>{apiKey&&apiKey!=='demo'?'Connecting to AI advisor...':'Add your API key in the AI Advisor tab to get personalised financial insights.'}</div>
+            }
+          </div>
+          <button style={{background:'rgba(99,102,241,0.18)',border:'1px solid rgba(99,102,241,0.35)',borderRadius:8,padding:'5px 11px',color:'#a78bfa',cursor:'pointer',fontSize:11,fontWeight:600,flexShrink:0,fontFamily:'DM Sans,sans-serif'}}
+            onClick={()=>setTab('ai')}>
+            Ask AI →
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={S.tabs}>
+          {[['overview','📊 Overview'],['loans','🏠 Loans'],['sip','📈 SIP'],['ai','🤖 AI Advisor']].map(([id,lbl])=>(
+            <button key={id} style={S.tab(tab===id)} onClick={()=>setTab(id)}>{lbl}</button>
+          ))}
+        </div>
+
+        {tab==='overview' && <Overview/>}
+        {tab==='loans'    && <Loans/>}
+        {tab==='sip'      && <SIP/>}
+        {tab==='ai'       && <AITab/>}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
